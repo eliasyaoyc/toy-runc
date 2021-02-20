@@ -1,2 +1,2 @@
-# rsroutine
-Rsroutine is a green-thread library like goroutine
+# RISC-V
+An experimental RIS-V operating system
