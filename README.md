@@ -1,17 +1,11 @@
-# Monitor
+# Go-workQueue
 
-An easy-to-use mointoring component to monitor system resource and related resources of specified processes.
+**WorkQueue** is an easy-to-use utility that provides a simple queue that supports the following features:
+* Element processed in the order in which they are added.
+* A single element will not be processed multiple times concurrently, and if an element's added multiple times before it can be processed, it will only be processed once.
+* Multiple consumers and producers. In particular, it is allowed for an item to be reenqueued while it is being processed.
+* Shutdown notifications.
 
-# Features
-
-* The level of system, e.g. the usage of cpu,disk,memory.
-* The level of process, e.g. the usage of cpu,memory.
-
-# Support Operation-System
-
-| MacOS | Linux |
-|-------|-------|
-| ✅     | ✅   |
 
 Licensed under of either of
 
