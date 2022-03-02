@@ -28,5 +28,4 @@ type WorkQueue struct {
 }
 
 func newWorkQueue() *WorkQueue {
-
 }
