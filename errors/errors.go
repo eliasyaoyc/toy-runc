@@ -28,10 +28,30 @@ func As(err error, target interface{}) bool {
 
 func Catch(fs ...func() error) error {
 	var err error
-	for i := 0; i < len(fs); i++ {
-		if e := fs[i](); e != nil {
+	for _, f := range fs {
+		if e := f(); e != nil {
 			err = Wrap("", e)
 		}
 	}
 	return err
+}
+
+type Any interface{}
+
+type Monad func(error) (Any, error)
+
+func Return(v Any) Monad {
+	return func(s error) (Any, error) {
+		return v, s
+	}
+}
+
+func Bind(m Monad, f func(Any) Monad) Monad {
+	return func(s error) (Any, error) {
+		newV, newS := m(s)
+		if newS != nil {
+			return nil, newS
+		}
+		return f(newV)(newS)
+	}
 }
