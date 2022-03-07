@@ -1,4 +1,4 @@
-package go_workqueue
+package queue
 
 type Plugin interface {
 }
