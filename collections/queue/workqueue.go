@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"palm/clock"
 	"sync"
 	"time"
 )
@@ -16,7 +17,7 @@ type Queue interface {
 }
 
 func New() *WorkQueue {
-	return newWorkQueue(defaultUnfinishedWorkUpdatePeriod)
+	return newWorkQueue(clock.RealClock{}, defaultUnfinishedWorkUpdatePeriod)
 }
 
 type t interface{}
@@ -33,16 +34,16 @@ type WorkQueue struct {
 	shuttingDown               bool
 	drain                      bool
 	unfinishedWorkUpdatePeriod time.Duration
-	clock                      time.Ticker
+	clock                      clock.WithTicker
 }
 
-func newWorkQueue(updatePeriod time.Duration) *WorkQueue {
+func newWorkQueue(c clock.WithTicker, updatePeriod time.Duration) *WorkQueue {
 	wq := &WorkQueue{
 		dirty:                      set{},
 		processing:                 set{},
 		cond:                       sync.NewCond(&sync.Mutex{}),
 		unfinishedWorkUpdatePeriod: updatePeriod,
-		clock:                      time.Ticker{},
+		clock:                      c,
 	}
 	return wq
 }
