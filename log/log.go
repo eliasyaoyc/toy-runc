@@ -140,6 +140,7 @@ type Option = zap.Option
 var (
 	WithCaller    = zap.WithCaller
 	AddStacktrace = zap.AddStacktrace
+	TimeFormat    = time.RFC3339
 )
 
 type RotateOptions struct {
@@ -162,7 +163,7 @@ func NewTeeWithRotate(tops []TeeOption, opts ...Option) *Logger {
 	var cores []zapcore.Core
 	cfg := zap.NewProductionConfig()
 	cfg.EncoderConfig.EncodeTime = func(t time.Time, encoder zapcore.PrimitiveArrayEncoder) {
-		encoder.AppendString(t.Format("2006-01-02T15:04:05.000Z0700"))
+		encoder.AppendString(t.Format(TimeFormat))
 	}
 
 	for _, top := range tops {
@@ -197,8 +198,9 @@ func NewTeeWithRotate(tops []TeeOption, opts ...Option) *Logger {
 func NewTee(tops []TeeOption, opts ...Option) *Logger {
 	var cores []zapcore.Core
 	cfg := zap.NewProductionConfig()
+
 	cfg.EncoderConfig.EncodeTime = func(time time.Time, encoder zapcore.PrimitiveArrayEncoder) {
-		encoder.AppendString(time.Format("2006-01-02T15:04:05.000Z0700"))
+		encoder.AppendString(time.Format(TimeFormat))
 	}
 	for _, top := range tops {
 		top := top
