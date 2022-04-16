@@ -1,5 +1,4 @@
-# Palm
-This package includes some of the usual tools and extracts some of the best code from the best projects(e.g. k8s etc).
+# Toy Docker 
 
 
 Licensed under of either of

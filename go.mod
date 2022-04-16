@@ -1,4 +1,4 @@
-module palm
+module toy-docker
 
 go 1.16
 
