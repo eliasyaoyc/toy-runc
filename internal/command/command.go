@@ -1,6 +1,9 @@
 package command
 
-const (
-	Init = 0
-	Run  = 1
-)
+import "github.com/urfave/cli"
+
+var AllSupportCommands []cli.Command
+
+func init() {
+	AllSupportCommands = append(AllSupportCommands, initCommand, runCommand)
+}
