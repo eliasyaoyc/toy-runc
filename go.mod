@@ -1,4 +1,4 @@
-module toy-docker
+module toy-runc
 
 go 1.16
 

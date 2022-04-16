@@ -2,7 +2,7 @@ package cgroups
 
 import (
 	"github.com/sirupsen/logrus"
-	"toy-docker/internal/cgroups/subsystems"
+	"toy-runc/internal/cgroups/subsystems"
 )
 
 type CgroupManager struct {

@@ -5,17 +5,18 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"os"
-	"toy-docker/internal/cgroups"
-	"toy-docker/internal/cgroups/subsystems"
-	"toy-docker/internal/container"
+	"strings"
+	"toy-runc/internal/cgroups"
+	"toy-runc/internal/cgroups/subsystems"
+	"toy-runc/internal/container"
 )
 
-const usage = `This is a simple container runtime implementation.`
+const Usage = "This is a simple container runtime implementation."
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "ToyDocker"
-	app.Usage = usage
+	app.Name = "ToyRunC"
+	app.Usage = Usage
 
 	app.Commands = []cli.Command{
 		initCommand,
@@ -79,29 +80,28 @@ var initCommand = cli.Command{
 	Name:  "init",
 	Usage: "Init container process run user's process in container. Do not call it outside",
 	Action: func(context *cli.Context) error {
-		logrus.Info("init.")
-		cmd := context.Args().Get(0)
-
-		logrus.Infof("command; %s", cmd)
+		logrus.Info("runC init.")
 		err := container.RunContainerInitProcess()
 		return err
 	},
 }
 
-func Run(tty bool, comArray []string, res *subsystems.ResourceConfig) {
+func Run(tty bool, cmdArray []string, res *subsystems.ResourceConfig) {
 	parent, writePipe := container.NewParentProcess(tty)
 	if err := parent.Start(); err != nil {
 		logrus.Error(err)
 	}
-	manager := cgroups.NewCgroupManager("toydocker-cgroup")
+	manager := cgroups.NewCgroupManager("toyRunC-cgroup")
 	defer manager.Destroy()
 	manager.Set(res)
 	manager.Apply(parent.Process.Pid)
 
-	sendInitCommand(comArray, writePipe)
+	sendInitCommand(cmdArray, writePipe)
 	parent.Wait()
 }
 
-func sendInitCommand(comArray []string, writePipe *os.File) {
-
+func sendInitCommand(cmdArray []string, writePipe *os.File) {
+	command := strings.Join(cmdArray, " ")
+	logrus.Infof("runC send run command; %s", command)
+	writePipe.WriteString(command)
 }
