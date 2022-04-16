@@ -2,8 +2,8 @@ package command
 
 import "github.com/urfave/cli"
 
-var AllSupportCommands []cli.Command
+var Commands []cli.Command
 
 func init() {
-	AllSupportCommands = append(AllSupportCommands, initCommand, runCommand)
+	Commands = append(Commands, initCommand, runCommand)
 }

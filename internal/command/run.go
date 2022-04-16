@@ -67,6 +67,7 @@ func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig) {
 }
 
 func sendInitCommand(cmdArray []string, writePipe *os.File) {
+	defer writePipe.Close()
 	command := strings.Join(cmdArray, " ")
 	logrus.Infof("runC send run command; %s", command)
 	writePipe.WriteString(command)

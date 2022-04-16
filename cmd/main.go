@@ -14,10 +14,9 @@ func main() {
 	app.Name = "ToyRunC"
 	app.Usage = Usage
 
-	app.Commands = command.AllSupportCommands
+	app.Commands = command.Commands
 
 	app.Before = func(context *cli.Context) error {
-		logrus.SetReportCaller(true)
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 		logrus.SetOutput(os.Stdout)
 
