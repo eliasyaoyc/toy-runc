@@ -3,9 +3,9 @@ package subsystems
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path"
 	"strconv"
+	"syscall"
 )
 
 type CpusetSubSystem struct {
@@ -41,7 +41,7 @@ func (c *CpusetSubSystem) Apply(cgroupPath string, pid int) error {
 
 func (c *CpusetSubSystem) Remove(cgroupPath string) error {
 	if subsysCgroupPath, err := GetCgroupPath(c.Name(), cgroupPath, false); err == nil {
-		return os.RemoveAll(subsysCgroupPath)
+		return syscall.Rmdir(subsysCgroupPath)
 	} else {
 		return err
 	}

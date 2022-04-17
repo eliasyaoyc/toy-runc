@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path"
 	"strconv"
+	"syscall"
 )
 
 type MemorySubSystem struct {
@@ -42,7 +42,7 @@ func (m *MemorySubSystem) Apply(cgroupPath string, pid int) error {
 
 func (m *MemorySubSystem) Remove(cgroupPath string) error {
 	if subsysCgroupPath, err := GetCgroupPath(m.Name(), cgroupPath, false); err == nil {
-		return os.Remove(subsysCgroupPath)
+		return syscall.Rmdir(subsysCgroupPath)
 	} else {
 		return err
 	}
