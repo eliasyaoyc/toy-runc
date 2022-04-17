@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -20,6 +21,9 @@ func RunContainerInitProcess() error {
 	if cmdArray == nil || len(cmdArray) == 0 {
 		return errors.New(fmt.Sprintf("run container get user command error; cmdArray is empty."))
 	}
+
+	// init mount point.
+	setUpMount()
 
 	path, err := exec.LookPath(cmdArray[0])
 
@@ -51,4 +55,42 @@ func readUserCommand() []string {
 	}
 	msgStr := string(msg)
 	return strings.Split(msgStr, " ")
+}
+
+func setUpMount() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		logrus.Errorf("get current location err; %v", err)
+		return
+	}
+	logrus.Infof("current location is %s", pwd)
+	pivotRoot(pwd)
+
+	// mount proc
+	defaultMointFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
+	syscall.Mount("proc", "/proc", "proc", uintptr(defaultMointFlags), "")
+
+	syscall.Mount("tmpfs", "/dev", "tmpfs", syscall.MS_NOSUID|syscall.MS_STRICTATIME, "mode=755")
+}
+
+func pivotRoot(root string) error {
+	if err := syscall.Mount(root, root, "bind", syscall.MS_BIND|syscall.MS_REC, ""); err != nil {
+		return errors.New(fmt.Sprintf("mount rootfs to iteself error: %v", err))
+	}
+	pivotDir := filepath.Join(root, ".pivot_root")
+	if err := os.Mkdir(pivotDir, 07777); err != nil {
+		return err
+	}
+	if err := syscall.PivotRoot(root, pivotDir); err != nil {
+		return errors.New(fmt.Sprintf("pivot_root error; %v", err))
+	}
+	if err := syscall.Chdir("/"); err != nil {
+		return errors.New(fmt.Sprintf("chdir / error;%v", err))
+	}
+	pivotDir = filepath.Join("/", ".pivot_root")
+	if err := syscall.Unmount(pivotDir, syscall.MNT_DETACH); err != nil {
+		return errors.New(fmt.Sprintf("unmount pivot_root dir error; %v", err))
+	}
+
+	return os.Remove(pivotDir)
 }
