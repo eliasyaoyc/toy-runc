@@ -9,5 +9,7 @@ func init() {
 		Commands,
 		initCommand,
 		runCommand,
-		commitCommand)
+		commitCommand,
+		listCommand,
+	)
 }

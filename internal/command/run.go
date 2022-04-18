@@ -2,6 +2,7 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"os"
@@ -19,6 +20,10 @@ var runCommand = cli.Command{
 			Name:  "it",
 			Usage: "enable tty",
 		},
+		cli.BoolFlag{
+			Name:  "d",
+			Usage: "detach container",
+		},
 		cli.StringFlag{
 			Name:  "m",
 			Usage: "memory limit",
@@ -31,6 +36,10 @@ var runCommand = cli.Command{
 			Name:  "cpuset",
 			Usage: "cpuset limit",
 		},
+		cli.StringFlag{
+			Name:  "name",
+			Usage: "container name",
+		},
 	},
 
 	Action: func(context *cli.Context) error {
@@ -42,33 +51,45 @@ var runCommand = cli.Command{
 			cmdArray = append(cmdArray, arg)
 		}
 		tty := context.Bool("it")
+		detach := context.Bool("d")
+
+		if tty && detach {
+			return fmt.Errorf("it and d paramter can not both provided/")
+		}
+
 		resConf := &subsystems.ResourceConfig{
 			MemoryLimit: context.String("m"),
 			CpuShare:    context.String("cpushare"),
 			CpuSet:      context.String("cpuset"),
 		}
-		run(tty, cmdArray, resConf)
+		containerName := context.String("name")
+		run(tty, cmdArray, resConf, containerName)
 		return nil
 	},
 }
 
-func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig) {
+func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerName string) {
 	parent, writePipe := container.NewParentProcess(tty)
 	if err := parent.Start(); err != nil {
 		logrus.Error(err)
 	}
-	manager := cgroups.NewCgroupManager("toyRunC-cgroup")
-	defer manager.Destroy()
-	manager.Set(res)
-	manager.Apply(parent.Process.Pid)
+
+	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName)
+	if err != nil {
+		logrus.Errorf("record container info error; %v", err)
+		return
+	}
+
+	cgroupManager := cgroups.NewCgroupManager("toyRunC-cgroup")
+	defer cgroupManager.Destroy()
+	cgroupManager.Set(res)
+	cgroupManager.Apply(parent.Process.Pid)
 
 	sendInitCommand(cmdArray, writePipe)
-	parent.Wait()
-
-	mntUrl := "/root/mnt/"
-	rootUrl := "/root/"
-	container.DeleteWorkSpace(rootUrl, mntUrl)
-	os.Exit(0)
+	if tty {
+		parent.Wait()
+		container.DeleteContainerInfo(containerName)
+	}
 }
 
 func sendInitCommand(cmdArray []string, writePipe *os.File) {
