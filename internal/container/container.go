@@ -37,10 +37,10 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 
 	cmd.ExtraFiles = []*os.File{readPipe}
 	logrus.Infof("runC recv run command; %s", cmd.String())
-	mntUrl := "/root/mnt/"
-	rootUrl := "/root/"
-	newWorkSpace(rootUrl, mntUrl)
-	cmd.Dir = mntUrl
+	mntURL := "/root/mnt/"
+	rootURL := "/root/"
+	newWorkSpace(rootURL, mntURL)
+	cmd.Dir = mntURL
 	return cmd, writePipe
 }
 
@@ -76,24 +76,23 @@ func createReadOnlyLayer(rootUrl string) {
 	}
 }
 
-func createWriteLayer(rootUrl string) {
-	writeUrl := rootUrl + "writeLayer/"
-	if err := os.Mkdir(writeUrl, 0777); err != nil {
-		logrus.Errorf("mkdir dir %s error; %v", writeUrl, err)
+func createWriteLayer(rootURL string) {
+	writeURL := rootURL + "writeLayer/"
+	if err := os.Mkdir(writeURL, 0777); err != nil {
+		logrus.Errorf("mkdir dir %s error. %v", writeURL, err)
 	}
 }
 
-func createMountpoint(rootUrl, mntUrl string) {
-	if err := os.Mkdir(mntUrl, 0777); err != nil {
-		logrus.Errorf("mkdir dir %s error; %v", mntUrl, err)
+func createMountpoint(rootURL, mntURL string) {
+	if err := os.Mkdir(mntURL, 0777); err != nil {
+		logrus.Errorf("mkdir dir %s error. %v", mntURL, err)
 	}
-	dirs := "dirs=" + rootUrl + "writeLayer:" + rootUrl + "busybox"
-	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", mntUrl)
+	dirs := "dirs=" + rootURL + "writeLayer:" + rootURL + "busybox"
+	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", mntURL)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
-		logrus.Errorf("%v", err)
+		logrus.Errorf("newWorkSpace create mountpoint error; %v", err)
 	}
 }
 
