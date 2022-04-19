@@ -4,6 +4,7 @@
 package container
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
@@ -31,9 +32,13 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stderr = os.Stderr
 	}
 
+	mntURL := "/root/mnt/"
+	rootURL := "/root/"
+
 	cmd.ExtraFiles = []*os.File{readPipe}
-	cmd.Dir = "/root/busybox"
+	cmd.Dir = mntURL
 	logrus.Infof("runC recv run command; %s", cmd.String())
+	newWorkSpace(rootURL, mntURL)
 	return cmd, writePipe
 }
 
@@ -76,12 +81,18 @@ func createWriteLayer(rootURL string) {
 	}
 }
 
+// Union filesystem.
 func createMountpoint(rootURL, mntURL string) {
 	if err := os.Mkdir(mntURL, 0777); err != nil {
 		logrus.Errorf("mkdir dir %s error. %v", mntURL, err)
 	}
-	dirs := "dirs=" + rootURL + "writeLayer:" + rootURL + "busybox"
-	cmd := exec.Command("mount", "-t", "aufs", "-o", dirs, "none", mntURL)
+
+	//dirs := "dirs=" + rootURL + "writeLayer:" + rootURL + "busybox"
+
+	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s",
+		rootURL+"busybox", rootURL+"writeLayer", rootURL+"temp")
+
+	cmd := exec.Command("mount", "-t", "overlay", "-o", options, "overlay", mntURL)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -101,11 +112,11 @@ func pathExist(path string) (bool, error) {
 }
 
 func DeleteWorkSpace(rootUrl, mntUrl string) {
-	deleteMountPoint(rootUrl, mntUrl)
+	deleteMountPoint(mntUrl)
 	deleteWriteLayer(rootUrl)
 }
 
-func deleteMountPoint(rootUrl, mntUrl string) {
+func deleteMountPoint(mntUrl string) {
 	cmd := exec.Command("umount", mntUrl)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
