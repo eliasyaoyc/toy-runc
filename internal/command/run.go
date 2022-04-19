@@ -7,7 +7,6 @@ import (
 	"github.com/urfave/cli"
 	"os"
 	"strings"
-	"toy-runc/internal/cgroups"
 	"toy-runc/internal/cgroups/subsystems"
 	"toy-runc/internal/container"
 )
@@ -74,16 +73,16 @@ func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerN
 		logrus.Error(err)
 	}
 
-	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName)
-	if err != nil {
-		logrus.Errorf("record container info error; %v", err)
-		return
-	}
+	//containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName)
+	//if err != nil {
+	//	logrus.Errorf("record container info error; %v", err)
+	//	return
+	//}
 
-	cgroupManager := cgroups.NewCgroupManager("toyRunC-cgroup")
-	defer cgroupManager.Destroy()
-	cgroupManager.Set(res)
-	cgroupManager.Apply(parent.Process.Pid)
+	//cgroupManager := cgroups.NewCgroupManager("toyRunC-cgroup")
+	//defer cgroupManager.Destroy()
+	//cgroupManager.Set(res)
+	//cgroupManager.Apply(parent.Process.Pid)
 
 	sendInitCommand(cmdArray, writePipe)
 	if tty {

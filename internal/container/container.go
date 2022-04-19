@@ -37,10 +37,10 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 
 	cmd.ExtraFiles = []*os.File{readPipe}
 	logrus.Infof("runC recv run command; %s", cmd.String())
-	mntURL := "/root/mnt/"
-	rootURL := "/root/"
-	newWorkSpace(rootURL, mntURL)
-	cmd.Dir = mntURL
+	//mntURL := "/root/mnt/"
+	//rootURL := "/root/"
+	//newWorkSpace(rootURL, mntURL)
+	//cmd.Dir = mntURL
 	return cmd, writePipe
 }
 

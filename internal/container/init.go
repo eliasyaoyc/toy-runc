@@ -12,6 +12,10 @@ import (
 	"syscall"
 )
 
+var (
+	containerInitCmdError = errors.New("run container get user command error; cmdArray is empty")
+)
+
 // RunContainerInitProcess execute inside the container and using mount
 // to mount the proc file system so that you can later use `ps` to view
 // the current process resources etc.
@@ -19,7 +23,7 @@ func RunContainerInitProcess() error {
 	cmdArray := readUserCommand()
 
 	if cmdArray == nil || len(cmdArray) == 0 {
-		return errors.New(fmt.Sprintf("run container get user command error; cmdArray is empty."))
+		return containerInitCmdError
 	}
 
 	// init mount point.
@@ -30,9 +34,9 @@ func RunContainerInitProcess() error {
 	path, err := exec.LookPath(cmdArray[0])
 
 	if err != nil {
-		logrus.Errorf("runC exec loop path error; %v", err)
-		return err
+		return fmt.Errorf("exec loop path error; %w", err)
 	}
+
 	// syscall.MS_NOEXEC: no other programs are allowed to run on this file system.
 	// syscall.MS_NOSUID: set-user-id or set-group-id is not allowed when running programs in this system，
 	// syscall.MS_NODEV: default param.
@@ -86,10 +90,10 @@ func setUpMount() error {
 
 func pivotRoot(root string) error {
 	// systemd 加入linux之后, mount namespace 就变成 shared by default, 必须显式声明新的mount namespace独立。
-	//err := syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
-	//if err != nil {
-	//	return err
-	//}
+	err := syscall.Mount("", "/", "", syscall.MS_PRIVATE|syscall.MS_REC, "")
+	if err != nil {
+		return err
+	}
 
 	// 重新mount root
 	// bind mount：将相同内容换挂载点
