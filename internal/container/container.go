@@ -22,13 +22,9 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 
 	cmd := exec.Command("/proc/self/exe", "init")
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS |
-			syscall.CLONE_NEWPID |
-			syscall.CLONE_NEWNS |
-			syscall.CLONE_NEWNET |
-			syscall.CLONE_NEWIPC,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS |
+			syscall.CLONE_NEWNET | syscall.CLONE_NEWIPC,
 	}
-
 	if tty {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
@@ -36,11 +32,8 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	}
 
 	cmd.ExtraFiles = []*os.File{readPipe}
+	cmd.Dir = "/root/busybox"
 	logrus.Infof("runC recv run command; %s", cmd.String())
-	//mntURL := "/root/mnt/"
-	//rootURL := "/root/"
-	//newWorkSpace(rootURL, mntURL)
-	//cmd.Dir = mntURL
 	return cmd, writePipe
 }
 

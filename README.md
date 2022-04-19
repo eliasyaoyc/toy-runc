@@ -21,7 +21,7 @@ CC=x86_64-linux-musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64  go build -ldflag
 ```bash
 ./runC run -it ls -l
 
-./runC run -it bash
+./runC run -it bin/sh
 ```
 
 * run with resource limit(cgroup)

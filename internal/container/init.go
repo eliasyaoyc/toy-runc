@@ -21,20 +21,22 @@ var (
 // the current process resources etc.
 func RunContainerInitProcess() error {
 	cmdArray := readUserCommand()
-
 	if cmdArray == nil || len(cmdArray) == 0 {
 		return containerInitCmdError
 	}
 
 	// init mount point.
 	if err := setUpMount(); err != nil {
-		return err
+		logrus.Errorf("init set mount error; %v", err)
+		return nil
 	}
 
-	path, err := exec.LookPath(cmdArray[0])
+	logrus.Infof("current path: %s", os.Getenv("PATH"))
 
+	path, err := exec.LookPath(cmdArray[0])
 	if err != nil {
-		return fmt.Errorf("exec loop path error; %w", err)
+		logrus.Errorf("look paht error; %v", err)
+		return nil
 	}
 
 	// syscall.MS_NOEXEC: no other programs are allowed to run on this file system.
@@ -43,7 +45,7 @@ func RunContainerInitProcess() error {
 	//defaultMountFlags := syscall.MS_NOEXEC | syscall.MS_NOSUID | syscall.MS_NODEV
 	//syscall.Mount("proc", "/proc", "proc", uintptr(defaultMountFlags), "")
 
-	logrus.Infof("runC find path %s", path)
+	logrus.Infof("find path %s", path)
 
 	// call int execve(cosnt char*filename, char*const argv[], char*const envp[]);
 	if err := syscall.Exec(path, cmdArray[0:], os.Environ()); err != nil {
@@ -69,6 +71,7 @@ func setUpMount() error {
 		return fmt.Errorf("pwd error:%v", err)
 	}
 
+	logrus.Infof("current location: %s", pwd)
 	if err = pivotRoot(pwd); err != nil {
 		return err
 	}
@@ -85,7 +88,6 @@ func setUpMount() error {
 	}
 
 	return nil
-
 }
 
 func pivotRoot(root string) error {

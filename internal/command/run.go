@@ -85,10 +85,12 @@ func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerN
 	//cgroupManager.Apply(parent.Process.Pid)
 
 	sendInitCommand(cmdArray, writePipe)
-	if tty {
-		parent.Wait()
-		container.DeleteContainerInfo(containerName)
-	}
+	parent.Wait()
+	os.Exit(0)
+	//if tty {
+	//	parent.Wait()
+	//	container.DeleteContainerInfo(containerName)
+	//}
 }
 
 func sendInitCommand(cmdArray []string, writePipe *os.File) {
