@@ -138,7 +138,7 @@ func NewParentProcess(tty bool, containerName, volume, imageName string, envSlic
 		stdLogFilePath := dirURL + ContainerLogFile
 		stdLogFile, err := os.Create(stdLogFilePath)
 		if err != nil {
-			logrus.Errorf("NewParentProcess create file %s error; %v", stdLogFile, err)
+			logrus.Errorf("NewParentProcess create file %s error; %v", stdLogFilePath, err)
 			return nil, nil
 		}
 		cmd.Stdout = stdLogFile
