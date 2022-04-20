@@ -13,13 +13,103 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"text/tabwriter"
+	"time"
 	"toy-runc/internal/command"
 )
+
+var (
+	RUNNING             = "running"
+	STOP                = "stopped"
+	Exit                = "exited"
+	DefaultInfoLocation = "/var/run/myRunc/%s/"
+	ContainerLogFile    = "container.log"
+	ConfigName          = "config.json"
+	RootUrl             = "/root"
+	MntUrl              = "/root/mnt/%s"
+	WriteLayerUrl       = "/root/writeLayer/%s"
+)
+
+type ContainerInfo struct {
+	Pid         string `json:"pid"`
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Command     string `json:"command"`
+	CreatedTime string `json:"createdTime"`
+	Status      string `json:"status"`
+	Volume      string `json:"volume"`
+}
+
+func RecordContainerInfo(containerPID int, commandArray []string, containerName, volume string) (string, error) {
+	id := randStringBytes(10)
+	createTime := time.Now().Format("2006-01-02 15:04:05")
+	command := strings.Join(commandArray, "")
+	if containerName == "" {
+		containerName = id
+	}
+	containerInfo := &ContainerInfo{
+		Pid:         strconv.Itoa(containerPID),
+		Id:          id,
+		Name:        containerName,
+		Command:     command,
+		CreatedTime: createTime,
+		Status:      RUNNING,
+		Volume:      volume,
+	}
+	jsonBytes, err := json.Marshal(containerInfo)
+	if err != nil {
+		logrus.Errorf("record container info error; %v", err)
+		return "", err
+	}
+	jsonStr := string(jsonBytes)
+
+	dirUrl := fmt.Sprintf(DefaultInfoLocation, containerName)
+	if err := os.MkdirAll(dirUrl, 0622); err != nil {
+		logrus.Errorf("mkdir error %s, error %v", dirUrl, err)
+		return "", err
+	}
+	fileName := dirUrl + "/" + ConfigName
+	file, err := os.Create(fileName)
+	if err != nil {
+		logrus.Errorf("create file %s error; %v", fileName, err)
+		return "", err
+	}
+	if _, err := file.WriteString(jsonStr); err != nil {
+		logrus.Errorf("file write string error; %v", err)
+		return "", err
+	}
+	return containerName, nil
+}
+
+func DeleteContainerInfo(containerId string) {
+	dirUrl := fmt.Sprintf(DefaultInfoLocation, containerId)
+	if err := os.RemoveAll(dirUrl); err != nil {
+		logrus.Errorf("remove dir %s error; %v", dirUrl, err)
+	}
+}
+
+func getContainerInfo(file os.FileInfo) (*ContainerInfo, error) {
+	containerName := file.Name()
+	configFileDir := fmt.Sprintf(DefaultInfoLocation, containerName)
+	configFileDir = configFileDir + ConfigName
+	content, err := ioutil.ReadFile(configFileDir)
+
+	if err != nil {
+		logrus.Errorf("read file %s error; %v", configFileDir, err)
+		return nil, err
+	}
+	var containerInfo ContainerInfo
+	if err := json.Unmarshal(content, &containerInfo); err != nil {
+		logrus.Errorf("json unmarshal error %v", err)
+		return nil, err
+	}
+	return &containerInfo, nil
+}
 
 // NewParentProcess create the execution env for the current process.
 // /proc/self/exe represent current program
 // create namespace-isolated container processes.
-func NewParentProcess(tty bool, containerName string) (*exec.Cmd, *os.File) {
+func NewParentProcess(tty bool, containerName, volume, imageName string, envSlice []string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
 		logrus.Errorf("new pipe error %v", err)
@@ -50,14 +140,47 @@ func NewParentProcess(tty bool, containerName string) (*exec.Cmd, *os.File) {
 		cmd.Stdout = stdLogFile
 	}
 
-	mntURL := "/root/mnt/"
-	rootURL := "/root/"
-
 	cmd.ExtraFiles = []*os.File{readPipe}
-	cmd.Dir = mntURL
+	cmd.Env = append(os.Environ(), envSlice...)
 	logrus.Infof("runC recv run command; %s", cmd.String())
-	newWorkSpace(rootURL, mntURL)
+	newWorkSpace(volume, imageName, containerName)
+	cmd.Dir = fmt.Sprintf(MntUrl, containerName)
 	return cmd, writePipe
+}
+
+func ListContainer() {
+	dirUrl := fmt.Sprintf(DefaultInfoLocation, "")
+	dirUrl = dirUrl[:len(dirUrl)-1]
+	files, err := ioutil.ReadDir(dirUrl)
+	if err != nil {
+		logrus.Errorf("read dir %s error; %v", dirUrl, err)
+		return
+	}
+	var containers []*ContainerInfo
+	for _, file := range files {
+		tmpContainer, err := getContainerInfo(file)
+		if err != nil {
+			logrus.Errorf("get container info error; %v", err)
+			continue
+		}
+		containers = append(containers, tmpContainer)
+	}
+	w := tabwriter.NewWriter(os.Stdout, 12, 1, 3, ' ', 0)
+	fmt.Fprint(w, "ID\tNAME\tPID\tSTATUS\tCOMMAND\tCREATED\n")
+	for _, item := range containers {
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			item.Id,
+			item.Name,
+			item.Pid,
+			item.Status,
+			item.Command,
+			item.CreatedTime,
+		)
+	}
+	if err := w.Flush(); err != nil {
+		logrus.Errorf("flush error %v", err)
+		return
+	}
 }
 
 func LogContainer(containerName string) {
@@ -91,8 +214,12 @@ func ExecContainer(containerName string, cmdArray []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
+
 	os.Setenv(command.ENV_EXEC_PID, pid)
 	os.Setenv(command.ENV_EXEC_CMD, cmdStr)
+	containerEnvs := getEnvsByPid(pid)
+
+	cmd.Env = append(os.Environ(), containerEnvs...)
 
 	if err := cmd.Run(); err != nil {
 		logrus.Errorf("exec container %s error; %v", containerName, err)
@@ -150,129 +277,5 @@ func RemoveContainer(containerName string) {
 	if err := os.RemoveAll(dirURL); err != nil {
 		logrus.Errorf("remove file %s error; %v", dirURL, err)
 		return
-	}
-}
-
-func getContainerInfoByName(containerName string) (*ContainerInfo, error) {
-	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
-	configFilePath := dirURL + ConfigName
-	contentBytes, err := ioutil.ReadFile(configFilePath)
-	if err != nil {
-		logrus.Errorf("read file %s error; %v", configFilePath, err)
-		return nil, err
-	}
-	var containerInfo ContainerInfo
-	if err := json.Unmarshal(contentBytes, &containerInfo); err != nil {
-		logrus.Errorf("getContainerInfoByName unmarshal error; %v", err)
-		return nil, err
-	}
-	return &containerInfo, nil
-}
-
-func getContainerPidByName(containerName string) (string, error) {
-	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
-	configFilePath := dirURL + ConfigName
-	contentBytes, err := ioutil.ReadFile(configFilePath)
-	if err != nil {
-		logrus.Errorf("read file %s error; %v", configFilePath, err)
-		return "", err
-	}
-	var containerInfo ContainerInfo
-	if err := json.Unmarshal(contentBytes, &containerInfo); err != nil {
-		return "", err
-	}
-	return containerInfo.Pid, nil
-}
-
-func newPipe() (*os.File, *os.File, error) {
-	read, write, err := os.Pipe()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return read, write, nil
-}
-
-func newWorkSpace(rootUrl string, mntUrl string) {
-	createReadOnlyLayer(rootUrl)
-	createWriteLayer(rootUrl)
-	createMountpoint(rootUrl, mntUrl)
-}
-
-func createReadOnlyLayer(rootUrl string) {
-	busyboxUrl := rootUrl + "busybox/"
-	busyboxTarUrl := rootUrl + "busybox.tar"
-	exist, err := pathExist(busyboxUrl)
-	if err != nil {
-		logrus.Errorf("fail to judge whether dir %s exists error; %v", busyboxUrl, err)
-	}
-	if exist == false {
-		if err := os.Mkdir(busyboxUrl, 0777); err != nil {
-			logrus.Errorf("mkdir dir %s error; %v", busyboxUrl, err)
-		}
-		if _, err := exec.Command("tar", "-xvf", busyboxTarUrl, "-C", busyboxUrl).CombinedOutput(); err != nil {
-			logrus.Errorf("unTar dir %s error; %v", busyboxTarUrl, err)
-		}
-	}
-}
-
-func createWriteLayer(rootURL string) {
-	writeURL := rootURL + "writeLayer/"
-	if err := os.Mkdir(writeURL, 0777); err != nil {
-		logrus.Errorf("mkdir dir %s error. %v", writeURL, err)
-	}
-}
-
-// Union filesystem.
-func createMountpoint(rootURL, mntURL string) {
-	if err := os.Mkdir(mntURL, 0777); err != nil {
-		logrus.Errorf("mkdir dir %s error. %v", mntURL, err)
-	}
-
-	//dirs := "dirs=" + rootURL + "writeLayer:" + rootURL + "busybox"
-
-	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s",
-		rootURL+"busybox", rootURL+"writeLayer", rootURL+"temp")
-
-	cmd := exec.Command("mount", "-t", "overlay", "-o", options, "overlay", mntURL)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		logrus.Errorf("newWorkSpace create mountpoint error; %v", err)
-	}
-}
-
-func pathExist(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
-}
-
-func DeleteWorkSpace(rootUrl, mntUrl string) {
-	deleteMountPoint(mntUrl)
-	deleteWriteLayer(rootUrl)
-}
-
-func deleteMountPoint(mntUrl string) {
-	cmd := exec.Command("umount", mntUrl)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		logrus.Errorf("error %v", err)
-	}
-	if err := os.RemoveAll(mntUrl); err != nil {
-		logrus.Errorf("remove dir %s error; %v", mntUrl, err)
-	}
-}
-
-func deleteWriteLayer(rootUrl string) {
-	writeUrl := rootUrl + "writeLayer/"
-	if err := os.RemoveAll(writeUrl); err != nil {
-		logrus.Errorf("remove dir %s error; %v", writeUrl, err)
 	}
 }

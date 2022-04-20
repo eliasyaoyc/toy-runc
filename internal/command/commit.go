@@ -2,9 +2,11 @@ package command
 
 import (
 	"errors"
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"os/exec"
+	"toy-runc/internal/container"
 )
 
 var commitError = errors.New("missing container name")
@@ -13,20 +15,23 @@ var commitCommand = cli.Command{
 	Name:  "commit",
 	Usage: "commit a container into image",
 	Action: func(context *cli.Context) error {
-		if len(context.Args()) < 1 {
+		if len(context.Args()) < 2 {
 			return commitError
 		}
-		imageName := context.Args().Get(0)
-		commitContainer(imageName)
+		containerName := context.Args().Get(0)
+		imageName := context.Args().Get(1)
+		commitContainer(containerName, imageName)
 		return nil
 	},
 }
 
-func commitContainer(imageName string) {
-	mntUrl := "/root/mnt"
-	imageTar := "/root/" + imageName + ".tar"
+func commitContainer(containerName, imageName string) {
+	mntURL := fmt.Sprintf(container.MntUrl, containerName)
+	mntURL += "/"
+
+	imageTar := container.RootUrl + "/" + imageName + ".tar"
 	logrus.Infof("%s", imageTar)
-	if _, err := exec.Command("tar", "-czf", imageTar, "-C", mntUrl, ".").CombinedOutput(); err != nil {
-		logrus.Errorf("tar folder %s error; %v", mntUrl, err)
+	if _, err := exec.Command("tar", "-czf", imageTar, "-C", mntURL, ".").CombinedOutput(); err != nil {
+		logrus.Errorf("tar folder %s error; %v", mntURL, err)
 	}
 }

@@ -39,6 +39,14 @@ var runCommand = cli.Command{
 			Name:  "name",
 			Usage: "container name",
 		},
+		cli.StringFlag{
+			Name:  "v",
+			Usage: "volume",
+		},
+		cli.StringSliceFlag{
+			Name:  "e",
+			Usage: "set environment",
+		},
 	},
 
 	Action: func(context *cli.Context) error {
@@ -49,6 +57,9 @@ var runCommand = cli.Command{
 		for _, arg := range context.Args() {
 			cmdArray = append(cmdArray, arg)
 		}
+		imageName := cmdArray[0]
+		cmdArray = cmdArray[1:]
+
 		tty := context.Bool("it")
 		detach := context.Bool("d")
 
@@ -62,18 +73,21 @@ var runCommand = cli.Command{
 			CpuSet:      context.String("cpuset"),
 		}
 		containerName := context.String("name")
-		run(tty, cmdArray, resConf, containerName)
+		volume := context.String("v")
+
+		envSlice := context.StringSlice("e")
+		run(tty, cmdArray, resConf, containerName, volume, imageName, envSlice)
 		return nil
 	},
 }
 
-func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerName string) {
-	parent, writePipe := container.NewParentProcess(tty)
+func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerName, volume, imageName string, envSlice []string) {
+	parent, writePipe := container.NewParentProcess(tty, containerName, volume, imageName, envSlice)
 	if err := parent.Start(); err != nil {
 		logrus.Error(err)
 	}
 
-	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName)
+	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName, volume)
 	if err != nil {
 		logrus.Errorf("record container info error; %v", err)
 		return
@@ -88,9 +102,7 @@ func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerN
 	if tty {
 		parent.Wait()
 		container.DeleteContainerInfo(containerName)
-		mntURL := "/root/mnt/"
-		rootURL := "/root/"
-		container.DeleteWorkSpace(rootURL, mntURL)
+		container.DeleteWorkSpace(volume, containerName)
 	}
 }
 
