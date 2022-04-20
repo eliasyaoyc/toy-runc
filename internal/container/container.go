@@ -4,12 +4,16 @@
 package container
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"syscall"
+	"toy-runc/internal/command"
 )
 
 // NewParentProcess create the execution env for the current process.
@@ -71,6 +75,113 @@ func LogContainer(containerName string) {
 		return
 	}
 	fmt.Fprint(os.Stdout, string(content))
+}
+
+func ExecContainer(containerName string, cmdArray []string) {
+	pid, err := getContainerPidByName(containerName)
+	if err != nil {
+		logrus.Errorf("exec container getContainerPidByName %s error; %v", containerName, err)
+		return
+	}
+	cmdStr := strings.Join(cmdArray, " ")
+	logrus.Infof("container pid %s", pid)
+	logrus.Infof("command %s", cmdStr)
+
+	cmd := exec.Command("/proc/self/exe", "exec")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	os.Setenv(command.ENV_EXEC_PID, pid)
+	os.Setenv(command.ENV_EXEC_CMD, cmdStr)
+
+	if err := cmd.Run(); err != nil {
+		logrus.Errorf("exec container %s error; %v", containerName, err)
+	}
+}
+
+func StopContainer(containerName string) {
+	pid, err := getContainerPidByName(containerName)
+	if err != nil {
+		logrus.Errorf("get container pid by name %s error; %v", containerName, err)
+		return
+	}
+
+	pidInt, err := strconv.Atoi(pid)
+	if err != nil {
+		logrus.Errorf("conver pid from string to int error; %v", err)
+		return
+	}
+
+	if err := syscall.Kill(pidInt, syscall.SIGTERM); err != nil {
+		logrus.Errorf("stop container %s error; %v", containerName, err)
+	}
+
+	containerInfo, err := getContainerInfoByName(containerName)
+	if err != nil {
+		logrus.Errorf("get container %s info error; %v", containerName, err)
+		return
+	}
+
+	containerInfo.Status = STOP
+	containerInfo.Pid = " "
+	newContentBytes, err := json.Marshal(containerInfo)
+	if err != nil {
+		logrus.Errorf("json marshal %s,error; %v", containerName, err)
+		return
+	}
+	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
+	configFilePath := dirURL + ConfigName
+	if err := ioutil.WriteFile(configFilePath, newContentBytes, 0622); err != nil {
+		logrus.Errorf("write file %s error; %v", configFilePath, err)
+	}
+}
+
+func RemoveContainer(containerName string) {
+	containerInfo, err := getContainerInfoByName(containerName)
+	if err != nil {
+		logrus.Errorf("get container %s info error; %v", containerName, err)
+		return
+	}
+	if containerInfo.Status != STOP {
+		logrus.Errorf("could't remove running container")
+		return
+	}
+	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
+	if err := os.RemoveAll(dirURL); err != nil {
+		logrus.Errorf("remove file %s error; %v", dirURL, err)
+		return
+	}
+}
+
+func getContainerInfoByName(containerName string) (*ContainerInfo, error) {
+	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
+	configFilePath := dirURL + ConfigName
+	contentBytes, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		logrus.Errorf("read file %s error; %v", configFilePath, err)
+		return nil, err
+	}
+	var containerInfo ContainerInfo
+	if err := json.Unmarshal(contentBytes, &containerInfo); err != nil {
+		logrus.Errorf("getContainerInfoByName unmarshal error; %v", err)
+		return nil, err
+	}
+	return &containerInfo, nil
+}
+
+func getContainerPidByName(containerName string) (string, error) {
+	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
+	configFilePath := dirURL + ConfigName
+	contentBytes, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		logrus.Errorf("read file %s error; %v", configFilePath, err)
+		return "", err
+	}
+	var containerInfo ContainerInfo
+	if err := json.Unmarshal(contentBytes, &containerInfo); err != nil {
+		return "", err
+	}
+	return containerInfo.Pid, nil
 }
 
 func newPipe() (*os.File, *os.File, error) {

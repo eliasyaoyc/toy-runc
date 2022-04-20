@@ -12,5 +12,8 @@ func init() {
 		commitCommand,
 		listCommand,
 		logCommand,
+		execCommand,
+		stopCommand,
+		removeCommand,
 	)
 }
