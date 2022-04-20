@@ -15,7 +15,11 @@ import (
 	"syscall"
 	"text/tabwriter"
 	"time"
-	"toy-runc/internal/command"
+)
+
+const (
+	ENV_EXEC_PID = "myrunc_pid"
+	ENV_EXEC_CMD = "myrunc_cmd"
 )
 
 var (
@@ -215,8 +219,8 @@ func ExecContainer(containerName string, cmdArray []string) {
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 
-	os.Setenv(command.ENV_EXEC_PID, pid)
-	os.Setenv(command.ENV_EXEC_CMD, cmdStr)
+	os.Setenv(ENV_EXEC_PID, pid)
+	os.Setenv(ENV_EXEC_CMD, cmdStr)
 	containerEnvs := getEnvsByPid(pid)
 
 	cmd.Env = append(os.Environ(), containerEnvs...)

@@ -36,6 +36,27 @@ CC=x86_64-linux-musl-gcc CGO_ENABLED=1 GOOS=linux GOARCH=amd64  go build -ldflag
 # Limit cpu 
 ./runC run -it -cpu 1 stress --vm-bytes 200m --vm-keep -m 1
 ```
+
+```bash
+USAGE:
+   runC [global options] command [command options] [arguments...]
+
+COMMANDS:
+   exec     exec a command into container
+   init     Init container process run user's process in container. Do not call it outside
+   ps       list all containers
+   logs     print logs of a container
+   rm       remove unused container
+   run      create a container: my-docker run -ti [command]
+   stop     stop a container
+   network  container network commands
+   commit   commit a container to image
+   image    image commands
+   help, h  Shows a list of commands or help for one command
+
+GLOBAL OPTIONS:
+   --help, -h  show help
+```
 Licensed under of either of
 
 * MIT license ([LICENSE-MIT](LICENSE) or http://opensource.org/licenses/MIT)
