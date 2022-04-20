@@ -53,7 +53,7 @@ var runCommand = cli.Command{
 		detach := context.Bool("d")
 
 		if tty && detach {
-			return fmt.Errorf("it and d paramter can not both provided/")
+			return fmt.Errorf("it and d paramter can not both provided")
 		}
 
 		resConf := &subsystems.ResourceConfig{
@@ -73,11 +73,11 @@ func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerN
 		logrus.Error(err)
 	}
 
-	//containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName)
-	//if err != nil {
-	//	logrus.Errorf("record container info error; %v", err)
-	//	return
-	//}
+	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName)
+	if err != nil {
+		logrus.Errorf("record container info error; %v", err)
+		return
+	}
 
 	//cgroupManager := cgroups.NewCgroupManager("toyRunC-cgroup")
 	//defer cgroupManager.Destroy()
@@ -85,15 +85,13 @@ func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerN
 	//cgroupManager.Apply(parent.Process.Pid)
 
 	sendInitCommand(cmdArray, writePipe)
-	parent.Wait()
-	mntURL := "/root/mnt/"
-	rootURL := "/root/"
-	container.DeleteWorkSpace(rootURL, mntURL)
-	os.Exit(0)
-	//if tty {
-	//	parent.Wait()
-	//	container.DeleteContainerInfo(containerName)
-	//}
+	if tty {
+		parent.Wait()
+		container.DeleteContainerInfo(containerName)
+		mntURL := "/root/mnt/"
+		rootURL := "/root/"
+		container.DeleteWorkSpace(rootURL, mntURL)
+	}
 }
 
 func sendInitCommand(cmdArray []string, writePipe *os.File) {

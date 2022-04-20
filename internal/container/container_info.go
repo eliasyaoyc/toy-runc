@@ -27,6 +27,7 @@ var (
 	STOP                string = "stopped"
 	Exit                string = "exited"
 	DefaultInfoLocation string = "/var/run/myRunc/%s/"
+	ContainerLogFile    string = "container.log"
 	ConfigName          string = "config.json"
 )
 

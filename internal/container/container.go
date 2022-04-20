@@ -6,6 +6,7 @@ package container
 import (
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"syscall"
@@ -14,7 +15,7 @@ import (
 // NewParentProcess create the execution env for the current process.
 // /proc/self/exe represent current program
 // create namespace-isolated container processes.
-func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
+func NewParentProcess(tty bool, containerName string) (*exec.Cmd, *os.File) {
 	readPipe, writePipe, err := newPipe()
 	if err != nil {
 		logrus.Errorf("new pipe error %v", err)
@@ -30,6 +31,19 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+	} else {
+		dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
+		if err := os.MkdirAll(dirURL, 0622); err != nil {
+			logrus.Errorf("NewParentProcess mkdir %s error; %v", dirURL, err)
+			return nil, nil
+		}
+		stdLogFilePath := dirURL + ContainerLogFile
+		stdLogFile, err := os.Create(stdLogFilePath)
+		if err != nil {
+			logrus.Errorf("NewParentProcess create file %s error; %v", stdLogFile, err)
+			return nil, nil
+		}
+		cmd.Stdout = stdLogFile
 	}
 
 	mntURL := "/root/mnt/"
@@ -40,6 +54,23 @@ func NewParentProcess(tty bool) (*exec.Cmd, *os.File) {
 	logrus.Infof("runC recv run command; %s", cmd.String())
 	newWorkSpace(rootURL, mntURL)
 	return cmd, writePipe
+}
+
+func LogContainer(containerName string) {
+	dirURL := fmt.Sprintf(DefaultInfoLocation, containerName)
+	logFileLocation := dirURL + ContainerLogFile
+	file, err := os.Open(logFileLocation)
+	defer file.Close()
+	if err != nil {
+		logrus.Errorf("log container open file %s error; %v", logFileLocation, err)
+		return
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		logrus.Errorf("log container read file %s error; %v", logFileLocation, err)
+		return
+	}
+	fmt.Fprint(os.Stdout, string(content))
 }
 
 func newPipe() (*os.File, *os.File, error) {

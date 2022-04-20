@@ -11,5 +11,6 @@ func init() {
 		runCommand,
 		commitCommand,
 		listCommand,
+		logCommand,
 	)
 }
