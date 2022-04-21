@@ -35,25 +35,22 @@ var (
 )
 
 type ContainerInfo struct {
-	Pid         string `json:"pid"`
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Command     string `json:"command"`
-	CreatedTime string `json:"createdTime"`
-	Status      string `json:"status"`
-	Volume      string `json:"volume"`
+	Pid         string   `json:"pid"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Command     string   `json:"command"`
+	CreatedTime string   `json:"createdTime"`
+	Status      string   `json:"status"`
+	Volume      string   `json:"volume"`
+	PortMapping []string `json:"portmapping"`
 }
 
-func RecordContainerInfo(containerPID int, commandArray []string, containerName, volume string) (string, error) {
-	id := randStringBytes(10)
+func RecordContainerInfo(containerPID int, commandArray []string, containerName, containerId string, volume string) (string, error) {
 	createTime := time.Now().Format("2006-01-02 15:04:05")
 	command := strings.Join(commandArray, "")
-	if containerName == "" {
-		containerName = id
-	}
 	containerInfo := &ContainerInfo{
 		Pid:         strconv.Itoa(containerPID),
-		Id:          id,
+		Id:          containerId,
 		Name:        containerName,
 		Command:     command,
 		CreatedTime: createTime,

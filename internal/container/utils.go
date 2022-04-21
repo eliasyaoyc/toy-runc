@@ -54,7 +54,7 @@ func getContainerPidByName(containerName string) (string, error) {
 	return containerInfo.Pid, nil
 }
 
-func randStringBytes(n int) string {
+func RandStringBytes(n int) string {
 	letterBytes := "1234567890"
 	rand.Seed(time.Now().UnixNano())
 	b := make([]byte, n)

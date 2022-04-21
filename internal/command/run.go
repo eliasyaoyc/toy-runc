@@ -6,9 +6,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli"
 	"os"
+	"strconv"
 	"strings"
+	"toy-runc/internal/cgroups"
 	"toy-runc/internal/cgroups/subsystems"
 	"toy-runc/internal/container"
+	"toy-runc/internal/network"
 )
 
 var runCommand = cli.Command{
@@ -47,6 +50,14 @@ var runCommand = cli.Command{
 			Name:  "e",
 			Usage: "set environment",
 		},
+		cli.StringFlag{
+			Name:  "net",
+			Usage: "container network",
+		},
+		cli.StringSliceFlag{
+			Name:  "p",
+			Usage: "port mapping",
+		},
 	},
 
 	Action: func(context *cli.Context) error {
@@ -74,31 +85,54 @@ var runCommand = cli.Command{
 		}
 		containerName := context.String("name")
 		volume := context.String("v")
-
+		network := context.String("net")
+		portMapping := context.StringSlice("p")
 		envSlice := context.StringSlice("e")
-		run(tty, cmdArray, resConf, containerName, volume, imageName, envSlice)
+
+		run(tty, cmdArray, resConf, containerName, volume, imageName, envSlice, network, portMapping)
 		return nil
 	},
 }
 
-func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerName, volume, imageName string, envSlice []string) {
+func run(tty bool, cmdArray []string, res *subsystems.ResourceConfig, containerName, volume, imageName string, envSlice []string,
+	nw string, portMapping []string) {
+	containerID := container.RandStringBytes(10)
+
+	if containerName == "" {
+		containerName = containerID
+	}
+
 	parent, writePipe := container.NewParentProcess(tty, containerName, volume, imageName, envSlice)
 	if err := parent.Start(); err != nil {
 		logrus.Error(err)
 	}
 
-	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName, volume)
+	containerName, err := container.RecordContainerInfo(parent.Process.Pid, cmdArray, containerName, containerID, volume)
 	if err != nil {
 		logrus.Errorf("record container info error; %v", err)
 		return
 	}
 
-	//cgroupManager := cgroups.NewCgroupManager("toyRunC-cgroup")
-	//defer cgroupManager.Destroy()
-	//cgroupManager.Set(res)
-	//cgroupManager.Apply(parent.Process.Pid)
+	cgroupManager := cgroups.NewCgroupManager("toyRunC-cgroup")
+	defer cgroupManager.Destroy()
+	cgroupManager.Set(res)
+	cgroupManager.Apply(parent.Process.Pid)
 
+	if nw != "" {
+		network.Init()
+		containerInfo := &container.ContainerInfo{
+			Pid:         strconv.Itoa(parent.Process.Pid),
+			Id:          containerID,
+			Name:        containerName,
+			PortMapping: portMapping,
+		}
+		if err := network.Connect(nw, containerInfo); err != nil {
+			logrus.Errorf("error connect network; %v", err)
+			return
+		}
+	}
 	sendInitCommand(cmdArray, writePipe)
+
 	if tty {
 		parent.Wait()
 		container.DeleteContainerInfo(containerName)

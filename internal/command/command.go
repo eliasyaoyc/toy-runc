@@ -15,5 +15,6 @@ func init() {
 		execCommand,
 		stopCommand,
 		removeCommand,
+		networkCommand,
 	)
 }
